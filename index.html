@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Line Route</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const url = `http://15.235.184.218:6060/GetGpsHistoryTrack/100?SessionId=3921&User=test&DeviceId=411050044&BeginTime=2025~01~04~16~00~00&EndTime=2025~01~05~15~59~59&UtcFlag=1`
+        const map = L.map('map').setView([-33.211002, 151.496109], 15); // Center map at the initial point
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const coordinates = data.GpsHistoryTrackInfo.map(point => [
+                    parseFloat(point.la), // Latitude
+                    parseFloat(point.lo)  // Longitude
+                ]);
+                const polyline = L.polyline(coordinates, { color: 'blue' }).addTo(map);
+                map.fitBounds(polyline.getBounds());
+            });
+    </script>
+</body>
+
+</html>
