@@ -3,21 +3,62 @@
 
 <head>
     <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
         #map {
             height: 100vh;
             width: 100%;
+
+        }
+
+        .filter-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        .filter-option {
+            margin: 5px 0;
         }
     </style>
 </head>
 
 <body>
     <div id="map"></div>
+    <div class="filter-overlay">
+        <div class="filter-option">
+            <input type="radio" id="all" name="filter" value="all" checked>
+            <label for="all">All Devices</label>
+        </div>
+        <div class="filter-option">
+            <input type="radio" id="online" name="filter" value="online">
+            <label for="online">Online Only</label>
+        </div>
+        <div class="filter-option">
+            <input type="radio" id="offline" name="filter" value="offline">
+            <label for="offline">Offline Only</label>
+        </div>
+    </div>
 </body>
 
 <script>
 
     const apiURL = `http://15.235.184.218:6060/GetDevicesLastState/100?UserName=admin&SessionId=24208`
     const numberApi = `http://15.235.184.218:6060/GetDeviceList/100?UserName=admin&SessionId=139743`
+
+    let onlineMarkers = [];
+    let offlineMarkers = [];
+    let allMarkers = [];
 
     function initMap() {
         // Create a map centered on Krakow, Poland
@@ -48,6 +89,7 @@
                             return plate.DeviceId === location.DeviceId
                         })
 
+
                     const marker = new google.maps.Marker({
                         position: { lat: +location.Lat, lng: +location.Lon },
                         map: map,
@@ -65,8 +107,30 @@
                     });
 
                     bounds.extend(marker.getPosition());
+
+                    allMarkers.push({ marker, isOnline: IsOnline });
+
                 });
                 map.fitBounds(bounds);
+
+                // Updated filter event listeners
+                document.querySelectorAll('input[name="filter"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const value = e.target.value;
+                        allMarkers.forEach(({ marker, isOnline }) => {
+                            switch (value) {
+                                case 'online':
+                                    marker.setVisible(isOnline);
+                                    break;
+                                case 'offline':
+                                    marker.setVisible(!isOnline);
+                                    break;
+                                default: // 'all'
+                                    marker.setVisible(true);
+                            }
+                        });
+                    });
+                });
 
             })
 
