@@ -2,85 +2,6 @@
 <html>
 
 <head>
-    <title>Google Maps API - Add Markers</title>
-    <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjxBU2Rmj9czK28LqDbXvQIp5ccel9iwE&callback=initMap&libraries=places,drawing,geometry&v=weekly"
-        async></script>
-    <script>
-
-        const apiURL = `http://15.235.184.218:6060/GetDevicesLastState/100?UserName=admin&SessionId=24208`
-        const numberApi = `http://15.235.184.218:6060/GetDeviceList/100?UserName=admin&SessionId=139743`
-
-        function initMap() {
-            // Create a map centered on Krakow, Poland
-            const map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 50.0647, lng: 19.945 },
-                zoom: 3,
-            });
-
-
-            //promise all to fetch multiple api
-            Promise.all([
-                fetch(apiURL),
-                fetch(numberApi)
-            ])
-                .then(([response1, response2]) => {
-                    return Promise.all([response1.json(), response2.json()])
-                })
-                .then(([coordinates, plateNumbers]) => {
-                    console.log(coordinates)
-                    console.log(plateNumbers)
-
-
-                    var bounds = new google.maps.LatLngBounds();
-                    coordinates.forEach((location) => {
-
-
-                        const { PlateNumber } = plateNumbers.DeviceList
-                            .find(plate => {
-                                return plate.DeviceId === location.DeviceId
-                            })
-
-                        const marker = new google.maps.Marker({
-                            position: { lat: +location.Lat, lng: +location.Lon },
-                            map: map,
-                            title: location.DeviceName,
-                            icon: {
-                                url: createCustomIcon(PlateNumber),
-                                scaledSize: new google.maps.Size(120, 48),
-                                anchor: new google.maps.Point(60, 48),
-                            },
-                        });
-                        bounds.extend(marker.getPosition());
-                    });
-                    map.fitBounds(bounds);
-
-                })
-
-        }
-
-        // Initialize the map once the window has loaded
-        window.onload = initMap;
-
-        function createCustomIcon(plate) {
-            const svg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="80">
-                    <g transform="translate(0,0)">
-                        <!-- Orange background -->
-                        <rect x="0" y="0" width="200" height="50" fill="#FF5722" rx="4" />
-                        <!-- Orange arrow -->
-                        <path d="M90,50 L100,70 L110,50 Z" fill="#FF5722" />
-                        <!-- Text -->
-                        <text x="15" y="35" font-size="24" fill="#FFFFFF" font-family="Arial, sans-serif">
-                            🚛 ${plate}
-                        </text>
-                    </g>
-                </svg>`;
-            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-        }
-
-    </script>
-
     <style>
         #map {
             height: 100vh;
@@ -92,5 +13,87 @@
 <body>
     <div id="map"></div>
 </body>
+
+<script>
+
+    const apiURL = `http://15.235.184.218:6060/GetDevicesLastState/100?UserName=admin&SessionId=24208`
+    const numberApi = `http://15.235.184.218:6060/GetDeviceList/100?UserName=admin&SessionId=139743`
+
+    function initMap() {
+        // Create a map centered on Krakow, Poland
+        const map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 50.0647, lng: 19.945 },
+            zoom: 3,
+        });
+
+        //promise all to fetch multiple api
+        Promise.all([
+            fetch(apiURL),
+            fetch(numberApi)
+        ])
+            .then(([response1, response2]) => {
+                return Promise.all([response1.json(), response2.json()])
+            })
+            .then(([coordinates, plateNumbers]) => {
+                console.log(coordinates)
+                console.log(plateNumbers)
+
+
+                var bounds = new google.maps.LatLngBounds();
+                coordinates.forEach((location) => {
+
+
+                    const { PlateNumber, IsOnline } = plateNumbers.DeviceList
+                        .find(plate => {
+                            return plate.DeviceId === location.DeviceId
+                        })
+
+                    const marker = new google.maps.Marker({
+                        position: { lat: +location.Lat, lng: +location.Lon },
+                        map: map,
+                        title: location.DeviceName,
+                        icon: {
+                            url: createCustomIcon(PlateNumber, IsOnline),
+                            scaledSize: new google.maps.Size(120, 48),
+                            anchor: new google.maps.Point(60, 48),
+                        },
+                    });
+
+                    google.maps.event.addListener(marker, 'click', () => {
+                        const newWindowURL = `/device.html?DeviceId=${location.DeviceId}&Plate=${PlateNumber}`;
+                        window.open(newWindowURL, '_blank');
+                    });
+
+                    bounds.extend(marker.getPosition());
+                });
+                map.fitBounds(bounds);
+
+            })
+
+    }
+
+    function createCustomIcon(plate, IsOnline) {
+        const color = IsOnline ? "#4CAF50" : "#FF5722";
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="80">
+                <g transform="translate(0,0)">
+                    <!-- Orange background -->
+                    <rect x="0" y="0" width="200" height="50" fill="${color}" rx="4" />
+                    <!-- Orange arrow -->
+                    <path d="M90,50 L100,70 L110,50 Z" fill="${color}" />
+                    <!-- Text -->
+                    <text x="15" y="35" font-size="24" fill="#FFFFFF" font-family="Arial, sans-serif">
+                        🚛 ${plate}
+                    </text>
+                </g>
+            </svg>`;
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+</script>
+
+<script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjxBU2Rmj9czK28LqDbXvQIp5ccel9iwE&callback=initMap&libraries=places,drawing,geometry&v=weekly"
+    async></script>
 
 </html>
