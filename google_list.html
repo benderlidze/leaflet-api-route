@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+
+        }
+
+        .filter-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        .filter-option {
+            margin: 5px 0;
+        }
+
+        #list-info {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .list-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .list-item:hover {
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="list-info"></div>
+    <div class="filter-overlay">
+        <div class="filter-option">
+            <input type="radio" id="all" name="filter" value="all" checked>
+            <label for="all">All Devices</label>
+        </div>
+        <div class="filter-option">
+            <input type="radio" id="online" name="filter" value="online">
+            <label for="online">Online Only</label>
+        </div>
+        <div class="filter-option">
+            <input type="radio" id="offline" name="filter" value="offline">
+            <label for="offline">Offline Only</label>
+        </div>
+    </div>
+</body>
+
+<script>
+
+    const apiURL = `http://15.235.184.218:6060/GetDevicesLastState/100?UserName=admin&SessionId=24208`
+    const numberApi = `http://15.235.184.218:6060/GetDeviceList/100?UserName=admin&SessionId=139743`
+
+    const routeApiLink = `http://15.235.184.218:6060/GetGpsHistoryTrack/100?SessionId=3921&User=test&DeviceId=411050044&`
+    const listInfo = document.getElementById('list-info');
+
+    let onlineMarkers = [];
+    let offlineMarkers = [];
+    let allMarkers = [];
+    let currentPolyline = null;
+    let map;
+
+    function initMap() {
+        // Create a map centered on Krakow, Poland
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 50.0647, lng: 19.945 },
+            zoom: 3,
+        });
+
+        fetchList()
+    }
+
+    function fetchList() {
+        const url = `http://15.235.184.218:6060/GetDeviceOnlineOfflineLog/100?SessionId=3921&User=admin&DeviceId=411050044&BeginTime=2025~01~20~14~00~00&EndTime=2025~01~21~13~59~59&UtcFlag=1`
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                console.log('data', data);
+                const linkItemsList = []
+
+                const list = data.DeviceOnlineOfflineLogList.reverse()
+
+                for (let index = 0; index < list.length; index++) {
+                    const element = list[index];
+                    let click = "";
+
+                    if (list[index + 1]) {
+                        const beginTime = list[index].CreateTime.replace(/[-\s:]/g, '~');
+                        const endTime = list[index + 1].CreateTime.replace(/[-\s:]/g, '~');
+                        const routeLink = `${routeApiLink}BeginTime=${beginTime}&EndTime=${endTime}&UtcFlag=1`
+                        click = list[index + 1]
+                            ? `onClick="fetchRoute('${routeLink}')"`
+                            : ""
+
+                    }
+                    const log = list[index];
+
+                    const item =
+                        `<div class="list-item" ${click}>
+                            <span>${index + 1}.</span>
+                            <span>${log.IsOnline}</span>
+                            <span>${log.CreateTime}</span>
+                            <div>${log.Reason}</div>
+                        </div>`
+
+                    linkItemsList.push(item)
+                }
+
+                listInfo.innerHTML = linkItemsList.join('');
+            });
+    }
+
+    function fetchRoute(apiLink) {
+        console.log('apiLink', apiLink);
+
+        fetch(apiLink)
+            .then(response => response.json())
+            .then(json => {
+                console.log('data', json);
+
+                const data = json.GpsHistoryTrackInfo;
+
+                // Remove any existing polylines
+                if (currentPolyline) {
+                    currentPolyline.setMap(null);
+                }
+
+                // Convert data points to LatLng coordinates
+                const coordinates = data.map(point => ({
+                    lat: parseFloat(point.la),
+                    lng: parseFloat(point.lo)
+                }));
+
+                // Create bounds object
+                const bounds = new google.maps.LatLngBounds();
+
+                // Extend bounds with each coordinate
+                coordinates.forEach(coord => bounds.extend(coord));
+
+                // Fit the map to the bounds
+                if (coordinates.length === 0) {
+                    return;
+                }
+
+                map.fitBounds(bounds)
+
+                
+
+                // Create new polyline
+                currentPolyline = new google.maps.Polyline({
+                    path: coordinates,
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 2,
+                    map: map
+                });
+            });
+    }
+
+    function createCustomIcon(plate, IsOnline) {
+        const color = IsOnline ? "#4CAF50" : "#FF5722";
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="80">
+                <g transform="translate(0,0)">
+                    <!-- Orange background -->
+                    <rect x="0" y="0" width="200" height="50" fill="${color}" rx="4" />
+                    <!-- Orange arrow -->
+                    <path d="M90,50 L100,70 L110,50 Z" fill="${color}" />
+                    <!-- Text -->
+                    <text x="15" y="35" font-size="24" fill="#FFFFFF" font-family="Arial, sans-serif">
+                        🚛 ${plate}
+                    </text>
+                </g>
+            </svg>`;
+        return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+</script>
+
+<script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjxBU2Rmj9czK28LqDbXvQIp5ccel9iwE&callback=initMap&libraries=places,drawing,geometry&v=weekly"
+    async></script>
+
+</html>
